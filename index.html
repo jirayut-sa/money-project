@@ -35,16 +35,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
-        /* Custom Scrollbar for better look */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        
-        /* Modal Backdrop Blur */
         .modal-backdrop { backdrop-filter: blur(4px); }
-        
-        /* Fade transition */
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
@@ -356,7 +351,6 @@
 
             <!-- PDF Container Preview -->
             <div class="bg-gray-200 p-4 sm:p-8 rounded-xl overflow-auto flex justify-center">
-                <!-- The actual content to be printed -->
                 <div id="pdf-content" class="bg-white p-10 shadow-lg w-full max-w-[210mm] min-h-[297mm] text-slate-800">
                     <!-- Report Header -->
                     <div class="text-center mb-8 border-b-2 border-slate-800 pb-4">
@@ -451,7 +445,7 @@
 
     <!-- ==================== APPLICATION LOGIC (JavaScript) ==================== -->
     <script>
-        // CONFIGURATION: Set to false to use real Google Apps Script API
+        // เปลี่ยนเป็น false เพื่อใช้งานจริง (ใช้ API จาก Google Apps Script)
         const USE_MOCK_API = false; 
         const GOOGLE_APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxAp8LMD0REqRkJAN-OZmURWNXvn9OFXbhzZbVKttZ3Iyr9JdmcWtzawwD_Xh9z6Gdpcw/exec'; 
 
@@ -482,7 +476,7 @@
                 currentView: 'dashboard',
                 isAdmin: false,
                 currentYear: '2567',
-                years: ['2567', '2566'],
+                years: [],
                 projects: [],
                 activities: [],
                 selectedProjectId: null,
@@ -490,45 +484,25 @@
                 charts: { doughnut: null, bar: null }
             },
 
-            // Mock Data (For initial preview)
-            mockData: {
-                projects: [
-                    { id: 1, year: '2567', name: 'โครงการอบรมเชิงปฏิบัติการพัฒนาทักษะดิจิทัล', allocated: 50000 },
-                    { id: 2, year: '2567', name: 'โครงการปรับปรุงระบบเครือข่ายภายในองค์กร', allocated: 120000 },
-                    { id: 3, year: '2567', name: 'โครงการส่งเสริมสุขภาพพนักงาน', allocated: 30000 },
-                    { id: 4, year: '2566', name: 'โครงการจัดซื้ออุปกรณ์คอมพิวเตอร์', allocated: 200000 }
-                ],
-                activities: [
-                    { id: 101, projectId: 1, name: 'ค่าวิทยากร', allocated: 20000, used: 20000 },
-                    { id: 102, projectId: 1, name: 'ค่าอาหารว่างและเครื่องดื่ม', allocated: 15000, used: 12500 },
-                    { id: 103, projectId: 1, name: 'ค่าสถานที่และอุปกรณ์', allocated: 15000, used: 0 },
-                    { id: 201, projectId: 2, name: 'จัดซื้อสายไฟและอุปกรณ์', allocated: 80000, used: 75000 },
-                    { id: 202, projectId: 2, name: 'ค่าแรงติดตั้ง', allocated: 40000, used: 20000 },
-                    { id: 301, projectId: 3, name: 'กิจกรรมกีฬา', allocated: 15000, used: 15000 },
-                    { id: 302, projectId: 3, name: 'ตรวจสุขภาพประจำปี', allocated: 15000, used: 0 }
-                ]
-            },
-
             // Initialization
             init() {
                 if(USE_MOCK_API) {
-                    this.state.projects = [...this.mockData.projects];
-                    this.state.activities = [...this.mockData.activities];
+                    this.state.projects = [];
+                    this.state.activities = [];
                     this.renderYearSelector();
                     this.refreshDashboard();
                 } else {
                     this.fetchDataFromAPI();
                 }
                 
-                // Set initial date for report
                 document.getElementById('report-date-print').innerText = 'วันที่พิมพ์: ' + new Date().toLocaleDateString('th-TH', {
                     year: 'numeric', month: 'long', day: 'numeric'
                 });
             },
 
-            // API Calls (Using Google Apps Script)
+            // ==================== API Calls ====================
             async fetchDataFromAPI() {
-                this.showToast('กำลังโหลดข้อมูล...', 'info');
+                this.showToast('กำลังโหลดข้อมูลจากฐานข้อมูล...', 'info');
                 try {
                     const response = await fetch(`${GOOGLE_APP_SCRIPT_URL}?action=getData`);
                     const data = await response.json();
@@ -537,11 +511,13 @@
                         this.state.projects = data.projects;
                         this.state.activities = data.activities;
                         
-                        // Extract unique years
                         const years = [...new Set(data.projects.map(p => p.year))].sort((a,b) => b - a);
                         if(years.length > 0) {
                             this.state.years = years;
                             this.state.currentYear = years[0];
+                        } else {
+                            this.state.years = ['2567'];
+                            this.state.currentYear = '2567';
                         }
                         
                         this.renderYearSelector();
@@ -565,8 +541,9 @@
                     return;
                 }
 
+                this.showToast('กำลังบันทึกข้อมูล...', 'info');
                 try {
-                    const res = await fetch(GOOGLE_APP_SCRIPT_URL, {
+                    await fetch(GOOGLE_APP_SCRIPT_URL, {
                         method: 'POST',
                         mode: 'no-cors', 
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -578,9 +555,32 @@
                     
                     this.refreshProjectDetail(this.state.selectedProjectId);
                     this.closeBudgetModal();
-                    this.showToast('บันทึกข้อมูลสำเร็จ', 'success');
+                    this.showToast('บันทึกข้อมูลลงระบบสำเร็จ', 'success');
                 } catch(e) {
                     this.showToast('เกิดข้อผิดพลาดในการบันทึก', 'error');
+                }
+            },
+
+            async saveProjectsToAPI(newProjects, newActivities) {
+                if(USE_MOCK_API) return; 
+
+                const payload = JSON.stringify({
+                    projects: newProjects,
+                    activities: newActivities
+                });
+
+                this.showToast('กำลังซิงค์ข้อมูลลงฐานข้อมูล...', 'info');
+                try {
+                    await fetch(GOOGLE_APP_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: `action=addProjects&data=${encodeURIComponent(payload)}`
+                    });
+                    this.showToast('บันทึกข้อมูลโครงการลงระบบสำเร็จ', 'success');
+                } catch(e) {
+                    console.error('Error saving projects:', e);
+                    this.showToast('เกิดข้อผิดพลาดในการบันทึกโครงการไปยังระบบ', 'error');
                 }
             },
 
@@ -594,10 +594,14 @@
                 if(viewId === 'reports') this.initReports();
             },
 
-            // Dashboard Functions
+            // ==================== Dashboard ====================
             renderYearSelector() {
                 const select = document.getElementById('year-selector');
-                select.innerHTML = this.state.years.map(y => `<option value="${y}">${y}</option>`).join('');
+                if (this.state.years.length === 0) {
+                    select.innerHTML = `<option value="${this.state.currentYear}">${this.state.currentYear}</option>`;
+                } else {
+                    select.innerHTML = this.state.years.map(y => `<option value="${y}">${y}</option>`).join('');
+                }
                 select.value = this.state.currentYear;
             },
 
@@ -616,7 +620,6 @@
                 let projUsedCount = 0;
                 let projUnusedCount = 0;
 
-                // Calculate project stats
                 const projectTableData = yearProjects.map(proj => {
                     const projActivities = this.state.activities.filter(a => a.projectId === proj.id);
                     const used = projActivities.reduce((sum, act) => sum + (Number(act.used) || 0), 0);
@@ -631,16 +634,12 @@
                     return { ...proj, used, remain };
                 });
 
-                // Update Cards
                 document.getElementById('card-total-budget').innerText = formatMoney(totalAllocated) + ' ฿';
                 document.getElementById('card-used-budget').innerText = formatMoney(totalUsed) + ' ฿';
                 document.getElementById('card-remain-budget').innerText = formatMoney(totalAllocated - totalUsed) + ' ฿';
                 document.getElementById('card-project-status').innerText = `${projUsedCount} / ${projUnusedCount}`;
 
-                // Update Charts
                 this.renderCharts(totalUsed, (totalAllocated - totalUsed), projectTableData);
-
-                // Update Table
                 this.renderProjectTable(projectTableData);
             },
 
@@ -680,14 +679,13 @@
                 const ctxDoughnut = document.getElementById('budgetDoughnutChart').getContext('2d');
                 if(this.state.charts.doughnut) this.state.charts.doughnut.destroy();
                 
-                // สร้างมิติลูกเล่น Gradient 3D สำหรับกราฟโดนัท
                 const gradRed = ctxDoughnut.createLinearGradient(0, 0, 0, 400);
-                gradRed.addColorStop(0, '#f43f5e'); // rose-500
-                gradRed.addColorStop(1, '#9f1239'); // rose-800
+                gradRed.addColorStop(0, '#f43f5e'); 
+                gradRed.addColorStop(1, '#9f1239'); 
                 
                 const gradBlue = ctxDoughnut.createLinearGradient(0, 0, 0, 400);
-                gradBlue.addColorStop(0, '#3b82f6'); // blue-500
-                gradBlue.addColorStop(1, '#1e3a8a'); // blue-900
+                gradBlue.addColorStop(0, '#3b82f6'); 
+                gradBlue.addColorStop(1, '#1e3a8a'); 
 
                 this.state.charts.doughnut = new Chart(ctxDoughnut, {
                     type: 'doughnut',
@@ -705,7 +703,7 @@
                     options: { 
                         responsive: true, 
                         maintainAspectRatio: false, 
-                        cutout: '60%', // ทำให้โดนัทมีมิติหนาขึ้น
+                        cutout: '60%', 
                         plugins: { legend: { position: 'bottom' } } 
                     }
                 });
@@ -713,7 +711,6 @@
                 const ctxBar = document.getElementById('projectsBarChart').getContext('2d');
                 if(this.state.charts.bar) this.state.charts.bar.destroy();
 
-                // สร้างลูกเล่น Gradient 3D สำหรับกราฟแท่ง
                 const barGradAlloc = ctxBar.createLinearGradient(0, 0, 0, 400);
                 barGradAlloc.addColorStop(0, '#94a3b8');
                 barGradAlloc.addColorStop(1, '#475569');
@@ -760,7 +757,7 @@
                 });
             },
 
-            // Project Detail Functions
+            // ==================== Project Detail ====================
             enterProject(projectId) {
                 this.state.selectedProjectId = projectId;
                 this.refreshProjectDetail(projectId);
@@ -779,7 +776,7 @@
                 
                 let sumAllocated = 0;
                 let sumUsed = 0;
-                let carriedDeficit = 0; // ตัวแปรสำหรับเก็บยอดใช้จ่ายเกินเพื่อยกยอดไปหักลบในกิจกรรมถัดไป
+                let carriedDeficit = 0;
 
                 const tbody = document.getElementById('activities-tbody');
                 if(activities.length === 0) {
@@ -789,11 +786,9 @@
                         sumAllocated += act.allocated;
                         sumUsed += (act.used || 0);
                         
-                        // หักลบยอดคงเหลือสะสม
                         let adjustedAllocated = act.allocated + carriedDeficit;
                         let remain = adjustedAllocated - (act.used || 0);
                         
-                        // หากติดลบ ให้นำยอดที่ติดลบไปทดในกิจกรรมถัดไป
                         if (remain < 0) {
                             carriedDeficit = remain;
                         } else {
@@ -824,9 +819,14 @@
                 document.getElementById('detail-sum-remain').innerText = formatMoney(sumAllocated - sumUsed);
                 
                 document.getElementById('detail-budget-remain').innerText = formatMoney(totalRemain) + ' ฿';
+                const elTotal = document.getElementById('detail-budget-remain');
+                if(totalRemain < 0) {
+                    elTotal.classList.replace('text-blue-600', 'text-rose-600');
+                } else {
+                    elTotal.classList.replace('text-rose-600', 'text-blue-600');
+                }
             },
 
-            // Budget Recording Modal
             openBudgetModal(activityId) {
                 const act = this.state.activities.find(a => a.id === activityId);
                 if(!act) return;
@@ -857,11 +857,11 @@
                 const act = this.state.activities.find(a => a.id === this.state.selectedActivityId);
                 const newTotalUsed = (Number(act.used) || 0) + addAmount;
                 
-                // นำเงื่อนไขแจ้งเตือน (confirm) ออก เพื่อให้บันทึกยอดที่เกินได้ทันทีและนำไปคำนวณต่อ
+                // ไม่มีการ Confirm สามารถบันทึกยอดที่เกินได้ทันที
                 this.saveBudgetToAPI(this.state.selectedActivityId, newTotalUsed);
             },
 
-            // Admin Functions
+            // ==================== Admin ====================
             showAdminLogin() {
                 if(this.state.isAdmin) {
                     this.navigate('admin');
@@ -901,6 +901,8 @@
                 const newProjId = Date.now(); 
                 const newProj = { id: newProjId, year: year, name: name, allocated: budget };
                 
+                const activitiesToSave = [];
+
                 this.state.projects.push(newProj);
                 if(!this.state.years.includes(year)) {
                     this.state.years.push(year);
@@ -912,29 +914,35 @@
                     const budgetPerAct = Math.floor(budget / actsArray.length);
                     
                     actsArray.forEach((actName, i) => {
-                        this.state.activities.push({
+                        const newAct = {
                             id: Date.now() + i + 1,
                             projectId: newProjId,
                             name: actName,
                             allocated: budgetPerAct,
                             used: 0
-                        });
+                        };
+                        this.state.activities.push(newAct);
+                        activitiesToSave.push(newAct);
                     });
                 } else {
-                    this.state.activities.push({
+                    const newAct = {
                         id: Date.now() + 1,
                         projectId: newProjId,
                         name: 'ดำเนินโครงการ',
                         allocated: budget,
                         used: 0
-                    });
+                    };
+                    this.state.activities.push(newAct);
+                    activitiesToSave.push(newAct);
                 }
 
                 document.getElementById('form-add-project').reset();
-                this.showToast('เพิ่มโครงการสำเร็จ', 'success');
+                this.showToast('อัปเดตระบบในเครื่องสำเร็จ กำลังบันทึก...', 'success');
+                
+                // สั่งบันทึกลง API
+                this.saveProjectsToAPI([newProj], activitiesToSave);
             },
 
-            // ดาวน์โหลดไฟล์ Excel Template
             downloadExcelTemplate() {
                 const ws_data = [
                     ['ปีงบประมาณ', 'ชื่อโครงการ', 'งบประมาณจัดสรร', 'กิจกรรมที่ 1', 'งบกิจกรรมที่ 1', 'กิจกรรมที่ 2', 'งบกิจกรรมที่ 2', 'กิจกรรมที่ 3', 'งบกิจกรรมที่ 3'],
@@ -943,7 +951,6 @@
                 ];
                 const ws = XLSX.utils.aoa_to_sheet(ws_data);
                 
-                // กำหนดความกว้างคอลัมน์
                 const wscols = [
                     {wch: 12}, {wch: 40}, {wch: 15}, 
                     {wch: 25}, {wch: 15}, 
@@ -959,7 +966,6 @@
                 this.showToast('ดาวน์โหลดไฟล์ Template สำเร็จ', 'success');
             },
 
-            // อัปเดตฟังก์ชันให้อ่านข้อมูลคอลัมน์รูปแบบใหม่ (Dynamic กิจกรรมที่ X, งบกิจกรรมที่ X)
             handleExcelUpload(event) {
                 const file = event.target.files[0];
                 if(!file) return;
@@ -974,6 +980,9 @@
                         const json = XLSX.utils.sheet_to_json(worksheet);
                         
                         let importedCount = 0;
+                        const addedProjects = [];
+                        const addedActivities = [];
+
                         json.forEach(row => {
                             const year = row['ปีงบประมาณ'] ? String(row['ปีงบประมาณ']) : '2567';
                             const name = row['ชื่อโครงการ'];
@@ -981,46 +990,56 @@
 
                             if(name && totalBudget > 0) {
                                 const newId = Date.now() + importedCount;
-                                this.state.projects.push({ id: newId, year: year, name: name, allocated: totalBudget });
+                                const newProj = { id: newId, year: year, name: name, allocated: totalBudget };
+                                
+                                this.state.projects.push(newProj);
+                                addedProjects.push(newProj);
                                 
                                 if(!this.state.years.includes(year)) this.state.years.push(year);
                                 
                                 let hasActivity = false;
                                 
-                                // ค้นหาคอลัมน์ "กิจกรรมที่ 1", "งบกิจกรรมที่ 1" ไปจนถึง 20
                                 for (let k = 1; k <= 20; k++) {
                                     const actName = row[`กิจกรรมที่ ${k}`];
                                     const actBudget = Number(row[`งบกิจกรรมที่ ${k}`] || 0);
                                     
                                     if (actName && actBudget > 0) {
-                                        this.state.activities.push({
+                                        const newAct = {
                                             id: Date.now() + importedCount + 1000 + k,
                                             projectId: newId,
                                             name: String(actName).trim(),
                                             allocated: actBudget,
                                             used: 0
-                                        });
+                                        };
+                                        this.state.activities.push(newAct);
+                                        addedActivities.push(newAct);
                                         hasActivity = true;
                                     }
                                 }
 
-                                // กรณีไม่ได้กรอกกิจกรรม หรือเกิดข้อผิดพลาดให้ใช้ค่าเริ่มต้น
                                 if (!hasActivity) {
-                                    this.state.activities.push({
+                                    const newAct = {
                                         id: Date.now() + importedCount + 2000,
                                         projectId: newId,
                                         name: 'ดำเนินโครงการทั่วไป',
                                         allocated: totalBudget,
                                         used: 0
-                                    });
+                                    };
+                                    this.state.activities.push(newAct);
+                                    addedActivities.push(newAct);
                                 }
                                 importedCount++;
                             }
                         });
 
                         this.state.years.sort((a,b) => b-a);
-                        this.showToast(`นำเข้าสำเร็จ ${importedCount} โครงการ`, 'success');
-                        event.target.value = ''; // reset input
+                        this.showToast(`นำเข้าสำเร็จ ${importedCount} โครงการ กำลังบันทึก...`, 'success');
+                        event.target.value = ''; 
+                        
+                        // สั่งบันทึกลง API
+                        if (addedProjects.length > 0) {
+                            this.saveProjectsToAPI(addedProjects, addedActivities);
+                        }
                         
                     } catch(err) {
                         alert('เกิดข้อผิดพลาดในการอ่านไฟล์ Excel ตรวจสอบรูปแบบคอลัมน์ให้ตรงกับ Template');
@@ -1030,7 +1049,7 @@
                 reader.readAsArrayBuffer(file);
             },
 
-            // Reports & PDF
+            // ==================== Reports & PDF ====================
             initReports() {
                 const select = document.getElementById('report-type');
                 const yearProjs = this.state.projects.filter(p => p.year === this.state.currentYear);
@@ -1139,7 +1158,7 @@
                         if (rem < 0) {
                             overStr = formatMoney(Math.abs(rem));
                             sumOver += Math.abs(rem);
-                            carriedDeficit = rem; // ยกยอดติดลบไปกิจกรรมถัดไป
+                            carriedDeficit = rem; 
                         } else {
                             carriedDeficit = 0;
                         }
@@ -1194,7 +1213,6 @@
                 });
             },
 
-            // Utility: UI Notifications
             showToast(msg, type = 'success') {
                 const toast = document.getElementById('toast');
                 const icon = document.getElementById('toast-icon');
