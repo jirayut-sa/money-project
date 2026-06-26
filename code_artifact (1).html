@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบงบประมาณการจัดทำโครงการ</title>
+    
+    <!-- Google Fonts: Prompt -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Prompt', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#1e40af', // blue-800
+                        secondary: '#3b82f6', // blue-500
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        /* Custom Scrollbar for better look */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Modal Backdrop Blur */
+        .modal-backdrop { backdrop-filter: blur(4px); }
+        
+        /* Fade transition */
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans">
+
+    <!-- Navbar -->
+    <nav class="bg-primary text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center space-x-3 cursor-pointer" onclick="app.navigate('dashboard')">
+                    <img src="https://i.postimg.cc/FKvMVwQz/loko-rong-re-yn.png" alt="Logo" class="h-10 w-auto bg-white rounded-full p-1 shadow-sm">
+                    <span class="font-bold text-xl hidden sm:block">ระบบจัดการงบประมาณโครงการ</span>
+                </div>
+                <div class="flex items-center space-x-6">
+                    <button onclick="app.navigate('dashboard')" class="hover:text-blue-200 transition-colors"><i class="fa-solid fa-house mr-1"></i> หน้าหลัก</button>
+                    <button onclick="app.navigate('reports')" class="hover:text-blue-200 transition-colors"><i class="fa-solid fa-file-invoice mr-1"></i> รายงาน</button>
+                    <button onclick="app.showAdminLogin()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors border border-white/30">
+                        <i class="fa-solid fa-gear mr-1"></i> ผู้ดูแลระบบ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full" id="main-content">
+        
+        <!-- ==================== VIEW: DASHBOARD ==================== -->
+        <div id="view-dashboard" class="view-section fade-in">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-slate-800 mb-2">แผนปฏิบัติการประจำปีงบประมาณ พ.ศ. <span id="dash-year-title" class="text-primary">2567</span></h1>
+                <p class="text-slate-500">สรุปภาพรวมการเบิกจ่ายและงบประมาณคงเหลือ</p>
+                
+                <div class="mt-4 inline-flex items-center bg-white rounded-lg shadow-sm border border-slate-200 p-1">
+                    <label class="px-3 text-slate-600 font-medium"><i class="fa-regular fa-calendar-days mr-2"></i>เลือกปีงบประมาณ:</label>
+                    <select id="year-selector" class="border-none bg-transparent py-1 pr-8 focus:ring-0 cursor-pointer font-bold text-primary" onchange="app.changeYear(this.value)">
+                        <!-- Populated via JS -->
+                    </select>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-sm border-l-4 border-emerald-500 p-6 flex flex-col justify-center">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm text-slate-500 mb-1">งบประมาณที่ได้รับทั้งหมด</p>
+                            <h3 class="text-2xl font-bold text-slate-800" id="card-total-budget">0 ฿</h3>
+                        </div>
+                        <div class="bg-emerald-100 text-emerald-600 p-3 rounded-lg"><i class="fa-solid fa-coins text-xl"></i></div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border-l-4 border-rose-500 p-6 flex flex-col justify-center">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm text-slate-500 mb-1">ใช้ไปแล้วทั้งหมด</p>
+                            <h3 class="text-2xl font-bold text-rose-600" id="card-used-budget">0 ฿</h3>
+                        </div>
+                        <div class="bg-rose-100 text-rose-600 p-3 rounded-lg"><i class="fa-solid fa-arrow-trend-down text-xl"></i></div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border-l-4 border-blue-500 p-6 flex flex-col justify-center">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm text-slate-500 mb-1">งบประมาณคงเหลือรวม</p>
+                            <h3 class="text-2xl font-bold text-blue-600" id="card-remain-budget">0 ฿</h3>
+                        </div>
+                        <div class="bg-blue-100 text-blue-600 p-3 rounded-lg"><i class="fa-solid fa-wallet text-xl"></i></div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border-l-4 border-amber-500 p-6 flex flex-col justify-center">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm text-slate-500 mb-1">สถานะโครงการ (ใช้แล้ว/ยังไม่ใช้)</p>
+                            <h3 class="text-2xl font-bold text-slate-800" id="card-project-status">0 / 0</h3>
+                        </div>
+                        <div class="bg-amber-100 text-amber-600 p-3 rounded-lg"><i class="fa-solid fa-chart-column text-xl"></i></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-1">
+                    <h3 class="font-bold text-slate-700 mb-4 text-center">สัดส่วนการใช้งบประมาณ</h3>
+                    <div class="relative h-64">
+                        <canvas id="budgetDoughnutChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-2">
+                    <h3 class="font-bold text-slate-700 mb-4">งบประมาณรายโครงการ (ได้รับ vs คงเหลือ)</h3>
+                    <div class="relative h-64">
+                        <canvas id="projectsBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Projects Table -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <h3 class="font-bold text-lg text-slate-800"><i class="fa-solid fa-list-check mr-2 text-primary"></i>รายชื่อโครงการทั้งหมด</h3>
+                    <div class="relative w-full sm:w-64">
+                        <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" id="search-project" placeholder="ค้นหาโครงการ..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary" onkeyup="app.filterProjects(this.value)">
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-600 text-sm">
+                                <th class="p-4 font-semibold text-center w-16">ลำดับ</th>
+                                <th class="p-4 font-semibold">ชื่อโครงการ</th>
+                                <th class="p-4 font-semibold text-right">งบที่ได้รับ (บาท)</th>
+                                <th class="p-4 font-semibold text-right">งบคงเหลือ (บาท)</th>
+                                <th class="p-4 font-semibold text-center w-32">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="projects-tbody" class="divide-y divide-slate-100">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== VIEW: PROJECT DETAIL ==================== -->
+        <div id="view-project" class="view-section fade-in hidden">
+            <button onclick="app.navigate('dashboard')" class="mb-4 text-slate-500 hover:text-primary transition-colors">
+                <i class="fa-solid fa-arrow-left mr-2"></i> กลับหน้าหลัก
+            </button>
+            
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 mb-8 text-center relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-2 bg-primary"></div>
+                <h2 class="text-xl text-slate-500 mb-2">โครงการตามแผนปฏิบัติการประจำปีงบประมาณ พ.ศ. <span id="detail-year" class="font-semibold text-primary"></span></h2>
+                <h1 class="text-3xl font-bold text-slate-800 mb-4" id="detail-project-name">ชื่อโครงการ</h1>
+                <div class="inline-block bg-slate-100 px-6 py-3 rounded-full border border-slate-200">
+                    <span class="text-slate-600 mr-2">งบประมาณโครงการ (ที่ได้รับจัดสรร):</span>
+                    <span class="text-2xl font-bold text-emerald-600" id="detail-budget-total">0</span> <span class="text-slate-600">บาท</span>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h3 class="font-bold text-lg text-slate-800"><i class="fa-solid fa-tasks mr-2 text-primary"></i>รายละเอียดกิจกรรมและการเบิกจ่าย</h3>
+                    <div class="text-right">
+                        <span class="text-sm text-slate-500 block">งบประมาณคงเหลือทั้งโครงการ</span>
+                        <span class="text-xl font-bold text-blue-600" id="detail-budget-remain">0 ฿</span>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 text-sm">
+                                <th class="p-4 font-semibold w-16 text-center">ลำดับ</th>
+                                <th class="p-4 font-semibold">กิจกรรม</th>
+                                <th class="p-4 font-semibold text-right w-40">งบประมาณ (บาท)</th>
+                                <th class="p-4 font-semibold text-right w-40">ใช้ไป (บาท)</th>
+                                <th class="p-4 font-semibold text-right w-40">คงเหลือ (บาท)</th>
+                                <th class="p-4 font-semibold text-center w-40">อัปเดตยอด</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activities-tbody" class="divide-y divide-slate-100">
+                            <!-- Populated via JS -->
+                        </tbody>
+                        <tfoot class="bg-slate-50 font-bold">
+                            <tr>
+                                <td colspan="2" class="p-4 text-right text-slate-700">รวมทั้งหมด:</td>
+                                <td class="p-4 text-right text-emerald-600" id="detail-sum-allocated">0</td>
+                                <td class="p-4 text-right text-rose-600" id="detail-sum-used">0</td>
+                                <td class="p-4 text-right text-blue-600" id="detail-sum-remain">0</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== VIEW: ADMIN ==================== -->
+        <div id="view-admin" class="view-section fade-in hidden">
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h1 class="text-3xl font-bold text-slate-800 mb-2"><i class="fa-solid fa-user-shield text-primary mr-3"></i>ผู้ดูแลระบบ</h1>
+                    <p class="text-slate-500">จัดการข้อมูลโครงการ ปีงบประมาณ และอัปโหลดไฟล์</p>
+                </div>
+                <button onclick="app.logoutAdmin()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg transition-colors">
+                    <i class="fa-solid fa-right-from-bracket mr-2"></i>ออกจากระบบ Admin
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                <!-- Add Single Project -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 h-fit">
+                    <h3 class="font-bold text-lg border-b pb-3 mb-4"><i class="fa-solid fa-plus-circle text-secondary mr-2"></i>เพิ่มโครงการใหม่ (รายเดี่ยว)</h3>
+                    <form id="form-add-project" onsubmit="event.preventDefault(); app.addSingleProject();">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">ปีงบประมาณ</label>
+                                <input type="number" id="admin-add-year" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary/50" value="2567">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อโครงการ</label>
+                                <input type="text" id="admin-add-name" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary/50" placeholder="เช่น โครงการพัฒนาบุคลากร...">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">งบประมาณที่ได้รับจัดสรร (บาท)</label>
+                                <input type="number" id="admin-add-budget" required min="0" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary/50" placeholder="0">
+                            </div>
+                            
+                            <div class="pt-2">
+                                <label class="block text-sm font-medium text-slate-700 mb-2">กิจกรรมในโครงการ (คั่นด้วยเครื่องหมายจุลภาค , )</label>
+                                <textarea id="admin-add-activities" rows="3" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary/50" placeholder="กิจกรรมที่ 1, กิจกรรมที่ 2, กิจกรรมที่ 3"></textarea>
+                                <p class="text-xs text-slate-400 mt-1">* ระบบจะแบ่งงบประมาณให้แต่ละกิจกรรมเท่าๆ กันอัตโนมัติ (สามารถแก้ไขภายหลังได้)</p>
+                            </div>
+                            
+                            <button type="submit" class="w-full bg-primary hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                                <i class="fa-solid fa-save mr-2"></i> บันทึกโครงการ
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Bulk Import Excel -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col">
+                    <div class="flex justify-between items-center border-b pb-3 mb-4">
+                        <h3 class="font-bold text-lg"><i class="fa-solid fa-file-excel text-emerald-600 mr-2"></i>อัปโหลดข้อมูลจาก Excel</h3>
+                    </div>
+                    
+                    <div class="flex-grow flex flex-col justify-center items-center p-6 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors">
+                        <i class="fa-solid fa-cloud-arrow-up text-5xl text-slate-400 mb-4"></i>
+                        <p class="text-slate-600 mb-4 text-center">ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์<br><span class="text-sm">รองรับเฉพาะไฟล์ .xlsx, .xls</span></p>
+                        
+                        <input type="file" id="excel-file" accept=".xlsx, .xls" class="hidden" onchange="app.handleExcelUpload(event)">
+                        <button onclick="document.getElementById('excel-file').click()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-6 rounded-lg transition-colors shadow-sm">
+                            เลือกไฟล์ Excel
+                        </button>
+                    </div>
+                    
+                    <div class="mt-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
+                            <p class="font-bold text-slate-700"><i class="fa-solid fa-table text-emerald-600 mr-2"></i>ตัวอย่างรูปแบบคอลัมน์ใน Excel ที่ระบบต้องการ:</p>
+                            <button onclick="app.downloadExcelTemplate()" class="text-sm bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold px-3 py-1.5 rounded-lg border border-emerald-300 transition-colors flex items-center shadow-sm">
+                                <i class="fa-solid fa-download mr-1"></i> ดาวน์โหลดไฟล์ตัวอย่าง (Template)
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto rounded border border-slate-300 shadow-sm">
+                            <table class="w-full text-left border-collapse bg-white text-xs whitespace-nowrap font-sans">
+                                <thead>
+                                    <tr class="bg-emerald-600 text-white">
+                                        <th class="border-b border-r border-emerald-700 p-2 font-medium text-center">A</th>
+                                        <th class="border-b border-r border-emerald-700 p-2 font-medium text-center">B</th>
+                                        <th class="border-b border-r border-emerald-700 p-2 font-medium text-center">C</th>
+                                        <th class="border-b border-r border-emerald-700 p-2 font-medium text-center">D</th>
+                                        <th class="border-b border-r border-emerald-700 p-2 font-medium text-center">E</th>
+                                        <th class="border-b border-r border-emerald-700 p-2 font-medium text-center">F</th>
+                                        <th class="border-b border-emerald-700 p-2 font-medium text-center">G</th>
+                                    </tr>
+                                    <tr class="bg-slate-100 text-slate-700">
+                                        <th class="border-b border-r border-slate-300 p-2">ปีงบประมาณ</th>
+                                        <th class="border-b border-r border-slate-300 p-2">ชื่อโครงการ</th>
+                                        <th class="border-b border-r border-slate-300 p-2">งบประมาณจัดสรร</th>
+                                        <th class="border-b border-r border-slate-300 p-2 text-blue-700 bg-blue-50">กิจกรรมที่ 1</th>
+                                        <th class="border-b border-r border-slate-300 p-2 text-blue-700 bg-blue-50">งบกิจกรรมที่ 1</th>
+                                        <th class="border-b border-r border-slate-300 p-2 text-amber-700 bg-amber-50">กิจกรรมที่ 2</th>
+                                        <th class="border-b border-slate-300 p-2 text-amber-700 bg-amber-50">งบกิจกรรมที่ 2</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-slate-600">
+                                    <tr>
+                                        <td class="border-r border-slate-200 p-2">2567</td>
+                                        <td class="border-r border-slate-200 p-2">โครงการพัฒนาทักษะ</td>
+                                        <td class="border-r border-slate-200 p-2 text-right">100,000</td>
+                                        <td class="border-r border-slate-200 p-2 bg-blue-50/30">อบรม</td>
+                                        <td class="border-r border-slate-200 p-2 bg-blue-50/30 text-right">60,000</td>
+                                        <td class="border-r border-slate-200 p-2 bg-amber-50/30">ศึกษาดูงาน</td>
+                                        <td class="p-2 bg-amber-50/30 text-right">40,000</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-xs mt-3 text-slate-500 font-medium leading-relaxed">
+                            <span class="text-rose-500 font-bold">* ข้อควรระวัง:</span> <br>
+                            1. ชื่อคอลัมน์แถวบนสุด (Header) ต้องพิมพ์ให้ตรงตามตัวอย่าง <br>
+                            2. สามารถเพิ่มคอลัมน์ <span class="font-bold text-slate-700">กิจกรรมที่ 3, งบกิจกรรมที่ 3</span> สลับกันเรียงต่อไปเรื่อยๆ ทางขวาได้ตามจำนวนกิจกรรมจริง
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== VIEW: REPORTS ==================== -->
+        <div id="view-reports" class="view-section fade-in hidden">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-8">
+                <div>
+                    <h1 class="text-3xl font-bold text-slate-800 mb-2"><i class="fa-solid fa-file-pdf text-rose-500 mr-3"></i>รายงานสรุปผล</h1>
+                    <p class="text-slate-500">สร้างรายงานและส่งออกเป็น PDF</p>
+                </div>
+                <div class="mt-4 sm:mt-0 flex gap-4">
+                    <select id="report-type" class="border border-slate-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" onchange="app.renderReportPreview()">
+                        <option value="all">รายงานภาพรวมทุกโครงการ</option>
+                        <!-- Dynamic projects added here -->
+                    </select>
+                    <button onclick="app.downloadPDF()" class="bg-rose-500 hover:bg-rose-600 text-white px-6 py-2 rounded-lg transition-colors shadow-sm flex items-center font-medium">
+                        <i class="fa-solid fa-download mr-2"></i> โหลด PDF
+                    </button>
+                </div>
+            </div>
+
+            <!-- PDF Container Preview -->
+            <div class="bg-gray-200 p-4 sm:p-8 rounded-xl overflow-auto flex justify-center">
+                <!-- The actual content to be printed -->
+                <div id="pdf-content" class="bg-white p-10 shadow-lg w-full max-w-[210mm] min-h-[297mm] text-slate-800">
+                    <!-- Report Header -->
+                    <div class="text-center mb-8 border-b-2 border-slate-800 pb-4">
+                        <img src="https://i.postimg.cc/FKvMVwQz/loko-rong-re-yn.png" onerror="this.style.display='none'" class="h-24 mx-auto mb-4 drop-shadow-md" alt="Logo">
+                        <h2 class="text-2xl font-bold mb-2">รายงานสรุปผลการใช้งบประมาณโครงการ</h2>
+                        <h3 class="text-xl" id="report-title-year">แผนปฏิบัติการประจำปีงบประมาณ พ.ศ. 2567</h3>
+                        <p class="text-sm mt-2" id="report-date-print">วันที่พิมพ์: -</p>
+                    </div>
+                    
+                    <!-- Report Body -->
+                    <div id="report-body">
+                        <!-- Populated via JS -->
+                    </div>
+                    
+                    <!-- Report Footer -->
+                    <div class="mt-16 pt-8 flex justify-end">
+                        <div class="text-center">
+                            <p class="mb-8">ผู้รายงาน</p>
+                            <p>...........................................................</p>
+                            <p class="mt-2">(...........................................................)</p>
+                            <p class="mt-1 text-sm">ตำแหน่ง ..................................................</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ==================== MODALS ==================== -->
+    
+    <!-- Admin Login Modal -->
+    <div id="modal-admin-login" class="fixed inset-0 z-50 flex items-center justify-center hidden modal-backdrop bg-slate-900/40">
+        <div class="bg-white rounded-xl shadow-2xl p-8 max-w-sm w-full mx-4 transform transition-all">
+            <div class="text-center mb-6">
+                <div class="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-lock text-2xl text-slate-600"></i>
+                </div>
+                <h3 class="text-xl font-bold text-slate-800">ยืนยันตัวตน Admin</h3>
+                <p class="text-sm text-slate-500 mt-1">กรุณาใส่ Passkey เพื่อเข้าสู่ระบบ</p>
+            </div>
+            <input type="password" id="admin-passkey" class="w-full text-center text-2xl tracking-[0.5em] px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary mb-6" placeholder="****">
+            <div class="flex gap-3">
+                <button onclick="document.getElementById('modal-admin-login').classList.add('hidden')" class="w-1/2 bg-slate-200 hover:bg-slate-300 text-slate-700 py-2 rounded-lg transition-colors font-medium">ยกเลิก</button>
+                <button onclick="app.verifyAdmin()" class="w-1/2 bg-primary hover:bg-blue-700 text-white py-2 rounded-lg transition-colors font-medium">เข้าสู่ระบบ</button>
+            </div>
+            <p id="admin-error" class="text-rose-500 text-sm text-center mt-3 hidden">Passkey ไม่ถูกต้อง!</p>
+        </div>
+    </div>
+
+    <!-- Record Budget Modal -->
+    <div id="modal-record-budget" class="fixed inset-0 z-50 flex items-center justify-center hidden modal-backdrop bg-slate-900/40">
+        <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
+            <div class="flex justify-between items-center mb-6 border-b pb-4">
+                <h3 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-pen-to-square text-secondary mr-2"></i>บันทึกยอดใช้งบประมาณ</h3>
+                <button onclick="app.closeBudgetModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            
+            <div class="mb-4">
+                <p class="text-sm text-slate-500 mb-1">กิจกรรม:</p>
+                <p class="font-semibold text-slate-800" id="modal-activity-name">ชื่อกิจกรรม</p>
+            </div>
+            
+            <div class="flex gap-4 mb-6 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                <div class="w-1/2">
+                    <p class="text-xs text-slate-500">งบที่ตั้งไว้</p>
+                    <p class="font-bold text-emerald-600" id="modal-activity-allocated">0 ฿</p>
+                </div>
+                <div class="w-1/2 border-l pl-4">
+                    <p class="text-xs text-slate-500">ใช้ไปแล้ว</p>
+                    <p class="font-bold text-rose-600" id="modal-activity-used">0 ฿</p>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-slate-700 mb-2">ระบุยอดเงินที่ใช้ไปเพิ่ม (บาท)</label>
+                <input type="number" id="input-use-amount" min="0" class="w-full text-lg px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" placeholder="0">
+                <p class="text-xs text-slate-400 mt-2">* ยอดที่กรอกจะถูกนำไปบวกเพิ่มกับยอดที่ใช้ไปแล้ว</p>
+            </div>
+
+            <button onclick="app.saveBudget()" class="w-full bg-primary hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors shadow-md">
+                บันทึกข้อมูล
+            </button>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 z-50 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-3">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-xl"></i>
+        <span id="toast-message">บันทึกสำเร็จ</span>
+    </div>
+
+    <!-- ==================== APPLICATION LOGIC (JavaScript) ==================== -->
+    <script>
+        // CONFIGURATION: Set to false to use real Google Apps Script API
+        const USE_MOCK_API = true; 
+        const GOOGLE_APP_SCRIPT_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE'; 
+
+        // Format Currency Helper
+        const formatMoney = (amount) => {
+            return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount).replace('฿', '').trim();
+        };
+
+        // Plugin สำหรับสร้างเงา 3D ให้กับ Chart.js
+        const shadow3DPlugin = {
+            id: 'shadow3D',
+            beforeDatasetsDraw(chart) {
+                const ctx = chart.ctx;
+                ctx.save();
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+                ctx.shadowBlur = 12;
+                ctx.shadowOffsetX = 5;
+                ctx.shadowOffsetY = 5;
+            },
+            afterDatasetsDraw(chart) {
+                chart.ctx.restore();
+            }
+        };
+
+        // Application State & Controller
+        const app = {
+            state: {
+                currentView: 'dashboard',
+                isAdmin: false,
+                currentYear: '2567',
+                years: ['2567', '2566'],
+                projects: [],
+                activities: [],
+                selectedProjectId: null,
+                selectedActivityId: null,
+                charts: { doughnut: null, bar: null }
+            },
+
+            // Mock Data (For initial preview)
+            mockData: {
+                projects: [
+                    { id: 1, year: '2567', name: 'โครงการอบรมเชิงปฏิบัติการพัฒนาทักษะดิจิทัล', allocated: 50000 },
+                    { id: 2, year: '2567', name: 'โครงการปรับปรุงระบบเครือข่ายภายในองค์กร', allocated: 120000 },
+                    { id: 3, year: '2567', name: 'โครงการส่งเสริมสุขภาพพนักงาน', allocated: 30000 },
+                    { id: 4, year: '2566', name: 'โครงการจัดซื้ออุปกรณ์คอมพิวเตอร์', allocated: 200000 }
+                ],
+                activities: [
+                    { id: 101, projectId: 1, name: 'ค่าวิทยากร', allocated: 20000, used: 20000 },
+                    { id: 102, projectId: 1, name: 'ค่าอาหารว่างและเครื่องดื่ม', allocated: 15000, used: 12500 },
+                    { id: 103, projectId: 1, name: 'ค่าสถานที่และอุปกรณ์', allocated: 15000, used: 0 },
+                    { id: 201, projectId: 2, name: 'จัดซื้อสายไฟและอุปกรณ์', allocated: 80000, used: 75000 },
+                    { id: 202, projectId: 2, name: 'ค่าแรงติดตั้ง', allocated: 40000, used: 20000 },
+                    { id: 301, projectId: 3, name: 'กิจกรรมกีฬา', allocated: 15000, used: 15000 },
+                    { id: 302, projectId: 3, name: 'ตรวจสุขภาพประจำปี', allocated: 15000, used: 0 }
+                ]
+            },
+
+            // Initialization
+            init() {
+                if(USE_MOCK_API) {
+                    this.state.projects = [...this.mockData.projects];
+                    this.state.activities = [...this.mockData.activities];
+                    this.renderYearSelector();
+                    this.refreshDashboard();
+                } else {
+                    this.fetchDataFromAPI();
+                }
+                
+                // Set initial date for report
+                document.getElementById('report-date-print').innerText = 'วันที่พิมพ์: ' + new Date().toLocaleDateString('th-TH', {
+                    year: 'numeric', month: 'long', day: 'numeric'
+                });
+            },
+
+            // API Calls (Using Google Apps Script)
+            async fetchDataFromAPI() {
+                this.showToast('กำลังโหลดข้อมูล...', 'info');
+                try {
+                    const response = await fetch(`${GOOGLE_APP_SCRIPT_URL}?action=getData`);
+                    const data = await response.json();
+                    
+                    if(data.status === 'success') {
+                        this.state.projects = data.projects;
+                        this.state.activities = data.activities;
+                        
+                        // Extract unique years
+                        const years = [...new Set(data.projects.map(p => p.year))].sort((a,b) => b - a);
+                        if(years.length > 0) {
+                            this.state.years = years;
+                            this.state.currentYear = years[0];
+                        }
+                        
+                        this.renderYearSelector();
+                        this.refreshDashboard();
+                        this.showToast('โหลดข้อมูลสำเร็จ', 'success');
+                    }
+                } catch (error) {
+                    console.error('API Error:', error);
+                    this.showToast('เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล', 'error');
+                }
+            },
+
+            async saveBudgetToAPI(activityId, newUsedAmount) {
+                if(USE_MOCK_API) {
+                    const act = this.state.activities.find(a => a.id === activityId);
+                    if(act) act.used = newUsedAmount;
+                    this.refreshProjectDetail(this.state.selectedProjectId);
+                    this.refreshDashboard(); 
+                    this.closeBudgetModal();
+                    this.showToast('บันทึกข้อมูลสำเร็จ', 'success');
+                    return;
+                }
+
+                try {
+                    const res = await fetch(GOOGLE_APP_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors', 
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: `action=updateBudget&activityId=${activityId}&usedAmount=${newUsedAmount}`
+                    });
+                    
+                    const act = this.state.activities.find(a => a.id === activityId);
+                    if(act) act.used = newUsedAmount;
+                    
+                    this.refreshProjectDetail(this.state.selectedProjectId);
+                    this.closeBudgetModal();
+                    this.showToast('บันทึกข้อมูลสำเร็จ', 'success');
+                } catch(e) {
+                    this.showToast('เกิดข้อผิดพลาดในการบันทึก', 'error');
+                }
+            },
+
+            // Navigation
+            navigate(viewId) {
+                document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+                document.getElementById(`view-${viewId}`).classList.remove('hidden');
+                this.state.currentView = viewId;
+
+                if(viewId === 'dashboard') this.refreshDashboard();
+                if(viewId === 'reports') this.initReports();
+            },
+
+            // Dashboard Functions
+            renderYearSelector() {
+                const select = document.getElementById('year-selector');
+                select.innerHTML = this.state.years.map(y => `<option value="${y}">${y}</option>`).join('');
+                select.value = this.state.currentYear;
+            },
+
+            changeYear(year) {
+                this.state.currentYear = year;
+                this.refreshDashboard();
+            },
+
+            refreshDashboard() {
+                document.getElementById('dash-year-title').innerText = this.state.currentYear;
+                
+                const yearProjects = this.state.projects.filter(p => p.year === this.state.currentYear);
+                
+                let totalAllocated = 0;
+                let totalUsed = 0;
+                let projUsedCount = 0;
+                let projUnusedCount = 0;
+
+                // Calculate project stats
+                const projectTableData = yearProjects.map(proj => {
+                    const projActivities = this.state.activities.filter(a => a.projectId === proj.id);
+                    const used = projActivities.reduce((sum, act) => sum + (Number(act.used) || 0), 0);
+                    const remain = proj.allocated - used;
+                    
+                    totalAllocated += proj.allocated;
+                    totalUsed += used;
+                    
+                    if(used > 0) projUsedCount++;
+                    else projUnusedCount++;
+
+                    return { ...proj, used, remain };
+                });
+
+                // Update Cards
+                document.getElementById('card-total-budget').innerText = formatMoney(totalAllocated) + ' ฿';
+                document.getElementById('card-used-budget').innerText = formatMoney(totalUsed) + ' ฿';
+                document.getElementById('card-remain-budget').innerText = formatMoney(totalAllocated - totalUsed) + ' ฿';
+                document.getElementById('card-project-status').innerText = `${projUsedCount} / ${projUnusedCount}`;
+
+                // Update Charts
+                this.renderCharts(totalUsed, (totalAllocated - totalUsed), projectTableData);
+
+                // Update Table
+                this.renderProjectTable(projectTableData);
+            },
+
+            renderProjectTable(data) {
+                const tbody = document.getElementById('projects-tbody');
+                if(data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-slate-500">ไม่พบโครงการในปีงบประมาณนี้</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = data.map((proj, index) => `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="p-4 text-center">${index + 1}</td>
+                        <td class="p-4 font-medium text-slate-700">${proj.name}</td>
+                        <td class="p-4 text-right">${formatMoney(proj.allocated)}</td>
+                        <td class="p-4 text-right font-medium ${proj.remain < 0 ? 'text-rose-600' : (proj.remain > 0 ? 'text-blue-600' : 'text-slate-500')}">${formatMoney(proj.remain)}</td>
+                        <td class="p-4 text-center">
+                            <button onclick="app.enterProject(${proj.id})" class="bg-slate-100 hover:bg-primary hover:text-white text-primary px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
+                                <i class="fa-solid fa-arrow-right-to-bracket mr-1"></i> เข้าสู่โครงการ
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            },
+
+            filterProjects(keyword) {
+                const term = keyword.toLowerCase();
+                const trs = document.getElementById('projects-tbody').querySelectorAll('tr');
+                trs.forEach(tr => {
+                    const name = tr.querySelector('td:nth-child(2)')?.textContent.toLowerCase() || '';
+                    if(name.includes(term)) tr.style.display = '';
+                    else tr.style.display = 'none';
+                });
+            },
+
+            renderCharts(used, remain, projectsData) {
+                const ctxDoughnut = document.getElementById('budgetDoughnutChart').getContext('2d');
+                if(this.state.charts.doughnut) this.state.charts.doughnut.destroy();
+                
+                // สร้างมิติลูกเล่น Gradient 3D สำหรับกราฟโดนัท
+                const gradRed = ctxDoughnut.createLinearGradient(0, 0, 0, 400);
+                gradRed.addColorStop(0, '#f43f5e'); // rose-500
+                gradRed.addColorStop(1, '#9f1239'); // rose-800
+                
+                const gradBlue = ctxDoughnut.createLinearGradient(0, 0, 0, 400);
+                gradBlue.addColorStop(0, '#3b82f6'); // blue-500
+                gradBlue.addColorStop(1, '#1e3a8a'); // blue-900
+
+                this.state.charts.doughnut = new Chart(ctxDoughnut, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['ใช้ไปแล้ว', 'คงเหลือ'],
+                        datasets: [{
+                            data: [used, Math.max(remain, 0)],
+                            backgroundColor: [gradRed, gradBlue],
+                            borderWidth: 2,
+                            borderColor: '#ffffff',
+                            hoverOffset: 8
+                        }]
+                    },
+                    plugins: [shadow3DPlugin],
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        cutout: '60%', // ทำให้โดนัทมีมิติหนาขึ้น
+                        plugins: { legend: { position: 'bottom' } } 
+                    }
+                });
+
+                const ctxBar = document.getElementById('projectsBarChart').getContext('2d');
+                if(this.state.charts.bar) this.state.charts.bar.destroy();
+
+                // สร้างลูกเล่น Gradient 3D สำหรับกราฟแท่ง
+                const barGradAlloc = ctxBar.createLinearGradient(0, 0, 0, 400);
+                barGradAlloc.addColorStop(0, '#94a3b8');
+                barGradAlloc.addColorStop(1, '#475569');
+
+                const barGradRem = ctxBar.createLinearGradient(0, 0, 0, 400);
+                barGradRem.addColorStop(0, '#60a5fa');
+                barGradRem.addColorStop(1, '#1d4ed8');
+
+                const labels = projectsData.map(p => p.name.length > 20 ? p.name.substring(0, 20) + '...' : p.name);
+                const allocatedData = projectsData.map(p => p.allocated);
+                const remainData = projectsData.map(p => p.remain);
+
+                this.state.charts.bar = new Chart(ctxBar, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { 
+                                label: 'งบที่ได้รับ', 
+                                data: allocatedData, 
+                                backgroundColor: barGradAlloc,
+                                borderRadius: 4,
+                                borderWidth: 1,
+                                borderColor: '#ffffff'
+                            },
+                            { 
+                                label: 'งบคงเหลือ', 
+                                data: remainData, 
+                                backgroundColor: barGradRem,
+                                borderRadius: 4,
+                                borderWidth: 1,
+                                borderColor: '#ffffff'
+                            }
+                        ]
+                    },
+                    plugins: [shadow3DPlugin],
+                    options: { 
+                        responsive: true, maintainAspectRatio: false,
+                        scales: { 
+                            y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                            x: { grid: { display: false } }
+                        }
+                    }
+                });
+            },
+
+            // Project Detail Functions
+            enterProject(projectId) {
+                this.state.selectedProjectId = projectId;
+                this.refreshProjectDetail(projectId);
+                this.navigate('project');
+            },
+
+            refreshProjectDetail(projectId) {
+                const proj = this.state.projects.find(p => p.id === projectId);
+                if(!proj) return;
+
+                document.getElementById('detail-year').innerText = proj.year;
+                document.getElementById('detail-project-name').innerText = proj.name;
+                document.getElementById('detail-budget-total').innerText = formatMoney(proj.allocated);
+
+                const activities = this.state.activities.filter(a => a.projectId === projectId);
+                
+                let sumAllocated = 0;
+                let sumUsed = 0;
+                let carriedDeficit = 0; // ตัวแปรสำหรับเก็บยอดใช้จ่ายเกินเพื่อยกยอดไปหักลบในกิจกรรมถัดไป
+
+                const tbody = document.getElementById('activities-tbody');
+                if(activities.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-slate-500">ยังไม่มีกิจกรรมในโครงการนี้</td></tr>`;
+                } else {
+                    tbody.innerHTML = activities.map((act, index) => {
+                        sumAllocated += act.allocated;
+                        sumUsed += (act.used || 0);
+                        
+                        // หักลบยอดคงเหลือสะสม
+                        let adjustedAllocated = act.allocated + carriedDeficit;
+                        let remain = adjustedAllocated - (act.used || 0);
+                        
+                        // หากติดลบ ให้นำยอดที่ติดลบไปทดในกิจกรรมถัดไป
+                        if (remain < 0) {
+                            carriedDeficit = remain;
+                        } else {
+                            carriedDeficit = 0;
+                        }
+                        
+                        return `
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-4 text-center">${index + 1}</td>
+                            <td class="p-4 font-medium text-slate-700">${act.name}</td>
+                            <td class="p-4 text-right">${formatMoney(act.allocated)}</td>
+                            <td class="p-4 text-right text-rose-600">${formatMoney(act.used || 0)}</td>
+                            <td class="p-4 text-right font-medium ${remain < 0 ? 'text-rose-600' : 'text-blue-600'}">${formatMoney(remain)}</td>
+                            <td class="p-4 text-center">
+                                <button onclick="app.openBudgetModal(${act.id})" class="bg-secondary hover:bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm transition-colors shadow-sm">
+                                    <i class="fa-solid fa-pen-to-square"></i> บันทึกยอด
+                                </button>
+                            </td>
+                        </tr>
+                        `;
+                    }).join('');
+                }
+
+                const totalRemain = proj.allocated - sumUsed;
+                
+                document.getElementById('detail-sum-allocated').innerText = formatMoney(sumAllocated);
+                document.getElementById('detail-sum-used').innerText = formatMoney(sumUsed);
+                document.getElementById('detail-sum-remain').innerText = formatMoney(sumAllocated - sumUsed);
+                
+                document.getElementById('detail-budget-remain').innerText = formatMoney(totalRemain) + ' ฿';
+            },
+
+            // Budget Recording Modal
+            openBudgetModal(activityId) {
+                const act = this.state.activities.find(a => a.id === activityId);
+                if(!act) return;
+
+                this.state.selectedActivityId = activityId;
+                
+                document.getElementById('modal-activity-name').innerText = act.name;
+                document.getElementById('modal-activity-allocated').innerText = formatMoney(act.allocated) + ' ฿';
+                document.getElementById('modal-activity-used').innerText = formatMoney(act.used || 0) + ' ฿';
+                document.getElementById('input-use-amount').value = '';
+                
+                document.getElementById('modal-record-budget').classList.remove('hidden');
+            },
+
+            closeBudgetModal() {
+                document.getElementById('modal-record-budget').classList.add('hidden');
+                this.state.selectedActivityId = null;
+            },
+
+            saveBudget() {
+                const inputVal = document.getElementById('input-use-amount').value;
+                if(!inputVal || isNaN(inputVal) || Number(inputVal) < 0) {
+                    alert('กรุณากรอกจำนวนเงินให้ถูกต้อง');
+                    return;
+                }
+                
+                const addAmount = Number(inputVal);
+                const act = this.state.activities.find(a => a.id === this.state.selectedActivityId);
+                const newTotalUsed = (Number(act.used) || 0) + addAmount;
+                
+                // นำเงื่อนไขแจ้งเตือน (confirm) ออก เพื่อให้บันทึกยอดที่เกินได้ทันทีและนำไปคำนวณต่อ
+                this.saveBudgetToAPI(this.state.selectedActivityId, newTotalUsed);
+            },
+
+            // Admin Functions
+            showAdminLogin() {
+                if(this.state.isAdmin) {
+                    this.navigate('admin');
+                } else {
+                    document.getElementById('admin-passkey').value = '';
+                    document.getElementById('admin-error').classList.add('hidden');
+                    document.getElementById('modal-admin-login').classList.remove('hidden');
+                }
+            },
+
+            verifyAdmin() {
+                const pass = document.getElementById('admin-passkey').value;
+                if(pass === '1234') {
+                    this.state.isAdmin = true;
+                    document.getElementById('modal-admin-login').classList.add('hidden');
+                    this.navigate('admin');
+                    this.showToast('เข้าสู่ระบบ Admin สำเร็จ', 'success');
+                } else {
+                    document.getElementById('admin-error').classList.remove('hidden');
+                }
+            },
+
+            logoutAdmin() {
+                this.state.isAdmin = false;
+                this.navigate('dashboard');
+                this.showToast('ออกจากระบบ Admin', 'info');
+            },
+
+            addSingleProject() {
+                const year = document.getElementById('admin-add-year').value;
+                const name = document.getElementById('admin-add-name').value;
+                const budget = Number(document.getElementById('admin-add-budget').value);
+                const actsText = document.getElementById('admin-add-activities').value;
+
+                if(!year || !name || budget <= 0) return alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+
+                const newProjId = Date.now(); 
+                const newProj = { id: newProjId, year: year, name: name, allocated: budget };
+                
+                this.state.projects.push(newProj);
+                if(!this.state.years.includes(year)) {
+                    this.state.years.push(year);
+                    this.state.years.sort((a,b) => b - a);
+                }
+
+                if(actsText.trim() !== '') {
+                    const actsArray = actsText.split(',').map(s => s.trim()).filter(s => s);
+                    const budgetPerAct = Math.floor(budget / actsArray.length);
+                    
+                    actsArray.forEach((actName, i) => {
+                        this.state.activities.push({
+                            id: Date.now() + i + 1,
+                            projectId: newProjId,
+                            name: actName,
+                            allocated: budgetPerAct,
+                            used: 0
+                        });
+                    });
+                } else {
+                    this.state.activities.push({
+                        id: Date.now() + 1,
+                        projectId: newProjId,
+                        name: 'ดำเนินโครงการ',
+                        allocated: budget,
+                        used: 0
+                    });
+                }
+
+                document.getElementById('form-add-project').reset();
+                this.showToast('เพิ่มโครงการสำเร็จ', 'success');
+            },
+
+            // ดาวน์โหลดไฟล์ Excel Template
+            downloadExcelTemplate() {
+                const ws_data = [
+                    ['ปีงบประมาณ', 'ชื่อโครงการ', 'งบประมาณจัดสรร', 'กิจกรรมที่ 1', 'งบกิจกรรมที่ 1', 'กิจกรรมที่ 2', 'งบกิจกรรมที่ 2', 'กิจกรรมที่ 3', 'งบกิจกรรมที่ 3'],
+                    ['2567', 'โครงการพัฒนาทักษะ', 100000, 'อบรม', 60000, 'ศึกษาดูงาน', 40000, '', ''],
+                    ['2567', 'โครงการตัวอย่าง (กิจกรรมเดียว)', 50000, 'ดำเนินงานทั่วไป', 50000, '', '', '', '']
+                ];
+                const ws = XLSX.utils.aoa_to_sheet(ws_data);
+                
+                // กำหนดความกว้างคอลัมน์
+                const wscols = [
+                    {wch: 12}, {wch: 40}, {wch: 15}, 
+                    {wch: 25}, {wch: 15}, 
+                    {wch: 25}, {wch: 15},
+                    {wch: 25}, {wch: 15}
+                ];
+                ws['!cols'] = wscols;
+
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Template");
+                
+                XLSX.writeFile(wb, "Project_Import_Template.xlsx");
+                this.showToast('ดาวน์โหลดไฟล์ Template สำเร็จ', 'success');
+            },
+
+            // อัปเดตฟังก์ชันให้อ่านข้อมูลคอลัมน์รูปแบบใหม่ (Dynamic กิจกรรมที่ X, งบกิจกรรมที่ X)
+            handleExcelUpload(event) {
+                const file = event.target.files[0];
+                if(!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const json = XLSX.utils.sheet_to_json(worksheet);
+                        
+                        let importedCount = 0;
+                        json.forEach(row => {
+                            const year = row['ปีงบประมาณ'] ? String(row['ปีงบประมาณ']) : '2567';
+                            const name = row['ชื่อโครงการ'];
+                            const totalBudget = Number(row['งบประมาณจัดสรร'] || row['งบประมาณ'] || 0);
+
+                            if(name && totalBudget > 0) {
+                                const newId = Date.now() + importedCount;
+                                this.state.projects.push({ id: newId, year: year, name: name, allocated: totalBudget });
+                                
+                                if(!this.state.years.includes(year)) this.state.years.push(year);
+                                
+                                let hasActivity = false;
+                                
+                                // ค้นหาคอลัมน์ "กิจกรรมที่ 1", "งบกิจกรรมที่ 1" ไปจนถึง 20
+                                for (let k = 1; k <= 20; k++) {
+                                    const actName = row[`กิจกรรมที่ ${k}`];
+                                    const actBudget = Number(row[`งบกิจกรรมที่ ${k}`] || 0);
+                                    
+                                    if (actName && actBudget > 0) {
+                                        this.state.activities.push({
+                                            id: Date.now() + importedCount + 1000 + k,
+                                            projectId: newId,
+                                            name: String(actName).trim(),
+                                            allocated: actBudget,
+                                            used: 0
+                                        });
+                                        hasActivity = true;
+                                    }
+                                }
+
+                                // กรณีไม่ได้กรอกกิจกรรม หรือเกิดข้อผิดพลาดให้ใช้ค่าเริ่มต้น
+                                if (!hasActivity) {
+                                    this.state.activities.push({
+                                        id: Date.now() + importedCount + 2000,
+                                        projectId: newId,
+                                        name: 'ดำเนินโครงการทั่วไป',
+                                        allocated: totalBudget,
+                                        used: 0
+                                    });
+                                }
+                                importedCount++;
+                            }
+                        });
+
+                        this.state.years.sort((a,b) => b-a);
+                        this.showToast(`นำเข้าสำเร็จ ${importedCount} โครงการ`, 'success');
+                        event.target.value = ''; // reset input
+                        
+                    } catch(err) {
+                        alert('เกิดข้อผิดพลาดในการอ่านไฟล์ Excel ตรวจสอบรูปแบบคอลัมน์ให้ตรงกับ Template');
+                        console.error(err);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            },
+
+            // Reports & PDF
+            initReports() {
+                const select = document.getElementById('report-type');
+                const yearProjs = this.state.projects.filter(p => p.year === this.state.currentYear);
+                
+                let optionsHtml = `<option value="all">รายงานภาพรวมทุกโครงการ (ปี ${this.state.currentYear})</option>`;
+                yearProjs.forEach(p => {
+                    optionsHtml += `<option value="${p.id}">เฉพาะ: ${p.name.substring(0,40)}...</option>`;
+                });
+                
+                select.innerHTML = optionsHtml;
+                this.renderReportPreview();
+            },
+
+            renderReportPreview() {
+                const val = document.getElementById('report-type').value;
+                const container = document.getElementById('report-body');
+                document.getElementById('report-title-year').innerText = `แผนปฏิบัติการประจำปีงบประมาณ พ.ศ. ${this.state.currentYear}`;
+
+                if(val === 'all') {
+                    const projs = this.state.projects.filter(p => p.year === this.state.currentYear);
+                    let html = `
+                        <table class="w-full text-sm border-collapse border border-slate-300">
+                            <thead>
+                                <tr class="bg-slate-100">
+                                    <th class="border border-slate-300 p-2 w-10">ที่</th>
+                                    <th class="border border-slate-300 p-2 text-left">ชื่อโครงการ</th>
+                                    <th class="border border-slate-300 p-2 text-right">งบจัดสรร</th>
+                                    <th class="border border-slate-300 p-2 text-right">เบิกจ่ายแล้ว</th>
+                                    <th class="border border-slate-300 p-2 text-right">คงเหลือ</th>
+                                    <th class="border border-slate-300 p-2 text-right text-rose-600">ใช้จ่ายเกินงบ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+                    
+                    let sumAll = 0, sumUsed = 0, sumRem = 0, sumOver = 0;
+                    projs.forEach((p, i) => {
+                        const acts = this.state.activities.filter(a => a.projectId === p.id);
+                        const used = acts.reduce((acc, a) => acc + (Number(a.used) || 0), 0);
+                        const rem = p.allocated - used;
+                        
+                        let overStr = '';
+                        if (rem < 0) {
+                            overStr = formatMoney(Math.abs(rem));
+                            sumOver += Math.abs(rem);
+                        }
+
+                        sumAll += p.allocated; sumUsed += used; sumRem += rem;
+                        
+                        html += `
+                            <tr>
+                                <td class="border border-slate-300 p-2 text-center">${i+1}</td>
+                                <td class="border border-slate-300 p-2">${p.name}</td>
+                                <td class="border border-slate-300 p-2 text-right">${formatMoney(p.allocated)}</td>
+                                <td class="border border-slate-300 p-2 text-right">${formatMoney(used)}</td>
+                                <td class="border border-slate-300 p-2 text-right ${rem < 0 ? 'text-rose-600 font-bold' : ''}">${formatMoney(rem)}</td>
+                                <td class="border border-slate-300 p-2 text-right text-rose-600 font-bold">${overStr}</td>
+                            </tr>
+                        `;
+                    });
+
+                    html += `
+                            <tr class="bg-slate-50 font-bold">
+                                <td colspan="2" class="border border-slate-300 p-2 text-right">รวมทั้งสิ้น</td>
+                                <td class="border border-slate-300 p-2 text-right">${formatMoney(sumAll)}</td>
+                                <td class="border border-slate-300 p-2 text-right">${formatMoney(sumUsed)}</td>
+                                <td class="border border-slate-300 p-2 text-right ${sumRem < 0 ? 'text-rose-600' : ''}">${formatMoney(sumRem)}</td>
+                                <td class="border border-slate-300 p-2 text-right text-rose-600">${sumOver > 0 ? formatMoney(sumOver) : ''}</td>
+                            </tr>
+                        </tbody></table>
+                    `;
+                    container.innerHTML = html;
+                } else {
+                    const proj = this.state.projects.find(p => p.id == val);
+                    const acts = this.state.activities.filter(a => a.projectId == val);
+                    
+                    let html = `
+                        <div class="mb-4">
+                            <h4 class="font-bold text-lg">ชื่อโครงการ: ${proj.name}</h4>
+                            <p>งบประมาณรวมที่ได้รับ: ${formatMoney(proj.allocated)} บาท</p>
+                        </div>
+                        <table class="w-full text-sm border-collapse border border-slate-300">
+                            <thead>
+                                <tr class="bg-slate-100">
+                                    <th class="border border-slate-300 p-2 w-10">ที่</th>
+                                    <th class="border border-slate-300 p-2 text-left">กิจกรรม</th>
+                                    <th class="border border-slate-300 p-2 text-right">งบที่ตั้ง (บาท)</th>
+                                    <th class="border border-slate-300 p-2 text-right">เบิกจ่าย (บาท)</th>
+                                    <th class="border border-slate-300 p-2 text-right">คงเหลือ (บาท)</th>
+                                    <th class="border border-slate-300 p-2 text-right text-rose-600">ใช้จ่ายเกินงบ (บาท)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+                    
+                    let sumSet = 0, sumUsed = 0, sumRem = 0, sumOver = 0;
+                    let carriedDeficit = 0;
+
+                    acts.forEach((a, i) => {
+                        sumSet += a.allocated; sumUsed += (a.used || 0);
+                        
+                        let adjustedAllocated = a.allocated + carriedDeficit;
+                        let rem = adjustedAllocated - (a.used || 0);
+                        
+                        let overStr = '';
+                        if (rem < 0) {
+                            overStr = formatMoney(Math.abs(rem));
+                            sumOver += Math.abs(rem);
+                            carriedDeficit = rem; // ยกยอดติดลบไปกิจกรรมถัดไป
+                        } else {
+                            carriedDeficit = 0;
+                        }
+
+                        html += `
+                            <tr>
+                                <td class="border border-slate-300 p-2 text-center">${i+1}</td>
+                                <td class="border border-slate-300 p-2">${a.name}</td>
+                                <td class="border border-slate-300 p-2 text-right">${formatMoney(a.allocated)}</td>
+                                <td class="border border-slate-300 p-2 text-right">${formatMoney(a.used || 0)}</td>
+                                <td class="border border-slate-300 p-2 text-right ${rem < 0 ? 'text-rose-600 font-bold' : ''}">${formatMoney(rem)}</td>
+                                <td class="border border-slate-300 p-2 text-right text-rose-600 font-bold">${overStr}</td>
+                            </tr>
+                        `;
+                    });
+
+                    const trueRem = proj.allocated - sumUsed;
+                    const totalOverStr = trueRem < 0 ? formatMoney(Math.abs(trueRem)) : '';
+
+                    html += `
+                            <tr class="bg-slate-50 font-bold">
+                                <td colspan="2" class="border border-slate-300 p-2 text-right">รวมการเบิกจ่ายกิจกรรม</td>
+                                <td class="border border-slate-300 p-2 text-right">${formatMoney(sumSet)}</td>
+                                <td class="border border-slate-300 p-2 text-right">${formatMoney(sumUsed)}</td>
+                                <td class="border border-slate-300 p-2 text-right">-</td>
+                                <td class="border border-slate-300 p-2 text-right">-</td>
+                            </tr>
+                            <tr class="font-bold bg-blue-50">
+                                <td colspan="4" class="border border-slate-300 p-2 text-right">งบประมาณคงเหลือสุทธิทั้งโครงการ</td>
+                                <td class="border border-slate-300 p-2 text-right ${trueRem < 0 ? 'text-rose-600' : ''}">${formatMoney(trueRem)}</td>
+                                <td class="border border-slate-300 p-2 text-right text-rose-600">${totalOverStr}</td>
+                            </tr>
+                        </tbody></table>
+                    `;
+                    container.innerHTML = html;
+                }
+            },
+
+            downloadPDF() {
+                this.showToast('กำลังสร้าง PDF...', 'info');
+                const element = document.getElementById('pdf-content');
+                const opt = {
+                    margin:       0,
+                    filename:     `รายงานงบประมาณ_${this.state.currentYear}_${Date.now()}.pdf`,
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2, useCORS: true },
+                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+
+                html2pdf().set(opt).from(element).save().then(() => {
+                    this.showToast('ดาวน์โหลด PDF สำเร็จ', 'success');
+                });
+            },
+
+            // Utility: UI Notifications
+            showToast(msg, type = 'success') {
+                const toast = document.getElementById('toast');
+                const icon = document.getElementById('toast-icon');
+                document.getElementById('toast-message').innerText = msg;
+                
+                if(type === 'success') {
+                    icon.className = 'fa-solid fa-circle-check text-emerald-400 text-xl';
+                } else if(type === 'error') {
+                    icon.className = 'fa-solid fa-circle-xmark text-rose-400 text-xl';
+                } else {
+                    icon.className = 'fa-solid fa-circle-info text-blue-400 text-xl';
+                }
+
+                toast.classList.remove('translate-y-20', 'opacity-0');
+                
+                setTimeout(() => {
+                    toast.classList.add('translate-y-20', 'opacity-0');
+                }, 3000);
+            }
+        };
+
+        // Run App
+        window.onload = () => app.init();
+    </script>
+</body>
+</html>
